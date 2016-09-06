@@ -12,12 +12,15 @@ public:
     : object_(object), state_(IDLE)
   {}
 
+  ~CPDefaultPooledObject()
+  {}
+
   T *getObject()
   {
     return object_;
   }
 
-    enum CPPooledObjectState getState()
+  enum CPPooledObjectState getState()
   {
     return state_;
   }

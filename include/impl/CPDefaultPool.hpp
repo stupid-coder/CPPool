@@ -2,7 +2,11 @@
 #define _CP_DEFAULT_POOL_H
 
 #include "interface/CPPool.hpp"
+#include "interface/CPPooledObjectFactory.hpp"
 #include "WrapperLock.hpp"
+#include <assert.h>
+#include <map>
+#include <deque>
 
 template <typename T>
 class CPDefaultPool : public CPPool<T>
@@ -10,7 +14,8 @@ class CPDefaultPool : public CPPool<T>
 public:
   CPDefaultPool(CPPooledObjectFactory<T> *factory,
                 int maxTotal)
-    : factory_(factory), maxTotal_(maxTotal) {}
+    : factory_(factory), maxTotal_(maxTotal)
+  {}
 
   ~CPDefaultPool()
   {
@@ -19,14 +24,19 @@ public:
 
   static long identifiyObjectId(T *object)
   {
-    return static_cast<long>(object);
+    return (long)object;
+  }
+
+  static long identifiyObjectId(CPPooledObject<T> *object)
+  {
+    return (long)object->getObject();
   }
 
   T *borrowObject()
   {
     CPPooledObject<T> *object = NULL;
 
-    GuardLock<WrapperLock>(idle_lock_);
+    GuardLock<WrapperLock> lock(idle_lock_);
     do
       {
         if ( idleObjects_.empty() ) addObject();
@@ -35,23 +45,23 @@ public:
       }
     while ( object == NULL );
 
-    assert(object->getObject()->getState()==IDLE);
-    object->getObject()->markAllocated();
+    assert(object->getState()==IDLE);
+    object->markAllocated();
 
     return object->getObject();
   }
 
   void returnObject(T *object)
   {
-    std::map<long,CPPooledObject<T>*>::iterator find_iter = allObjects_.find(identifiyObjectId(object));
+    typename std::map<long,CPPooledObject<T>*>::iterator find_iter = allObjects_.find(identifiyObjectId(object));
 
     assert(("out of bound" && find_iter!= allObjects_.end()));
 
     CPPooledObject<T> *pooled_object = find_iter->second;
 
-    pooled_object->markIdel();
+    pooled_object->markIdle();
 
-    GuardLock<WrapperLock>(idle_lock_);
+    GuardLock<WrapperLock> lock(idle_lock_);
 
     idleObjects_.push_back(pooled_object);
   }
@@ -61,7 +71,7 @@ public:
     CPPooledObject<T> *object = factory_->makeObject();
     assert(("factory makeObject is empty"&&object!=NULL));
 
-    GuardLock<WrapperLock>(all_lock_);
+    GuardLock<WrapperLock> lock(all_lock_);
     allObjects_.insert(std::make_pair<long,CPPooledObject<T>*>(identifiyObjectId(object),object));
   }
 
@@ -78,7 +88,7 @@ public:
           ++ iter )
       {
         if ( iter->second != NULL )
-          factory_->destoryObject(iter->second);
+          factory_->destroyObject(iter->second);
       }
     delete factory_;
   }
