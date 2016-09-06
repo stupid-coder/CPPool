@@ -5,6 +5,7 @@
 
 void *handler(void *arg)
 {
+  std::cout << "handler start..." << std::endl;
   CPDefaultPool<object> *cp = (CPDefaultPool<object>*)arg;
   for ( int i = 0; i < 100000; ++ i )
     {
@@ -20,6 +21,7 @@ int main(int argc, char *argv[])
   int size = 20;
   CPDefaultPool<object> cp(new TestPooledObjectFactory(),size);
   pthread_t thread[size];
+
   for ( int i = 0; i < size; ++i )
     {
       pthread_create(&thread[i],NULL,handler,&cp);

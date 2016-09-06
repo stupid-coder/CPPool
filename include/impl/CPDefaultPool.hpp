@@ -36,7 +36,7 @@ public:
   {
     CPPooledObject<T> *object = NULL;
 
-    GuardLock<WrapperLock> lock(idle_lock_);
+    GuardLock<WrapperLock> lock(lock_);
     do
       {
         if ( idleObjects_.empty() ) addObject();
@@ -61,7 +61,7 @@ public:
 
     pooled_object->markIdle();
 
-    GuardLock<WrapperLock> lock(idle_lock_);
+    GuardLock<WrapperLock> lock(lock_);
 
     idleObjects_.push_back(pooled_object);
   }
@@ -71,8 +71,8 @@ public:
     CPPooledObject<T> *object = factory_->makeObject();
     assert(("factory makeObject is empty"&&object!=NULL));
 
-    GuardLock<WrapperLock> lock(all_lock_);
     allObjects_.insert(std::make_pair<long,CPPooledObject<T>*>(identifiyObjectId(object),object));
+    idleObjects_.push_back(object);
   }
 
 
@@ -97,8 +97,7 @@ private:
   int maxTotal_;
   CPPooledObjectFactory<T> *factory_;
 
-  WrapperLock all_lock_;
-  WrapperLock idle_lock_;
+  WrapperLock lock_;
   std::map< long, CPPooledObject<T>* > allObjects_;
   std::deque< CPPooledObject<T>* > idleObjects_;
 };
