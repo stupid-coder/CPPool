@@ -14,9 +14,9 @@ public:
   virtual ~CPPooledObjectFactory() {};
   virtual CPPooledObject<T> *makeObject() = 0;
   virtual void destroyObject(CPPooledObject<T> *object) = 0;
-  //virtual bool validateObject(CPPooledObject<T> &object) = 0;
-  //virtual void activateObject(CPPooledObject<T> &object) = 0;
-  //virtual void passivateObject(CPPooledObject<T> &object) = 0;
+  virtual bool validateObject(CPPooledObject<T> &object) = 0;
+  virtual void activateObject(CPPooledObject<T> &object) = 0;
+  virtual void passivateObject(CPPooledObject<T> &object) = 0;
 };
 
 
