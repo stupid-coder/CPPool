@@ -2,6 +2,7 @@
 #include "cp.hpp"
 #include "TestPooledObjectFactory.hpp"
 #include <pthread.h>
+#include <sys/time.h>
 
 void *handler(void *arg)
 {
@@ -16,12 +17,32 @@ void *handler(void *arg)
   pthread_exit(NULL);
 }
 
+class Timer
+{
+public:
+  Timer()
+  {
+    gettimeofday(&begin,NULL);
+  }
+
+  ~Timer()
+  {
+    timeval end;
+    gettimeofday(&end,NULL);
+    std::cout << "Timer: " << (end.tv_sec-begin.tv_sec + (end.tv_usec-begin.tv_usec)/1000000.0) << "s" << std::endl;
+  }
+private:
+  timeval begin;
+};
+
 int main(int argc, char *argv[])
 {
+  setlinebuf(stdout);
   int size = 20;
   CPDefaultPool<object> cp(new TestPooledObjectFactory(),size);
   pthread_t thread[size];
 
+  Timer timer;
   for ( int i = 0; i < size; ++i )
     {
       pthread_create(&thread[i],NULL,handler,&cp);
