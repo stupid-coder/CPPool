@@ -21,12 +21,14 @@ namespace CPPool
   {
   public:
     GenericObjectPool(PooledObjectFactory<T> *factory)
+      : createCount_(0)
     {
       this->initGenericObjectPool(factory,new GenericObjectPoolConfig());
     }
 
     GenericObjectPool(PooledObjectFactory<T> *factory,
                       GenericObjectPoolConfig *config)
+      : createCount_(0)
     {
       this->initGenericObjectPool(factory,config);
     }
@@ -156,7 +158,6 @@ namespace CPPool
 
     virtual void clear() throw(IllegalStateException,UnsupportedOperationException)
     {
-      this->assertOpen();
 
       GuardMutexLock lock(lock_);
       while ( !idleObjects_.empty() )
@@ -164,6 +165,7 @@ namespace CPPool
           PooledObject<T> *object = this->getPooledObjectFromIdleObjects();
           this->destroy(object);
         }
+
     }
 
     virtual void close()
@@ -171,8 +173,6 @@ namespace CPPool
       if ( this->isClosed() ) return;
 
       this->closed_ = true;
-
-      GuardMutexLock lock(lock_);
 
       clear();
     }
