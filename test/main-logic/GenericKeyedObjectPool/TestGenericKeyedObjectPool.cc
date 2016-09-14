@@ -7,7 +7,11 @@
 
 std::string backends[] =
 {
-  "1","2","3","4","5"
+  std::string("1"),
+  std::string("2"),
+  std::string("3"),
+  std::string("4"),
+  std::string("5")
 };
 
 template <typename K,typename V>
@@ -37,6 +41,8 @@ public:
 void *test_routine(void *arg)
 {
 
+  int size_backends = sizeof(backends)/sizeof(std::string);
+
   CPPool::KeyedObjectPool<std::string,int> *pool = (CPPool::KeyedObjectPool<std::string,int>*)arg;
 
   timeval seed;
@@ -46,8 +52,9 @@ void *test_routine(void *arg)
 
   for ( int i = 0; i < LOOP_COUNT; ++i )
     {
-      std::string *backend = &backends[random()/sizeof(backends)];
-      int *client = pool->borrowObject(backend);
+      std::string *backend = &backends[random()%size_backends];
+      std::cout << "backends:" << backend->c_str() << std::endl;
+2     int *client = pool->borrowObject(backend);
       ++ *client;
       pool->returnObject(backend,client);
     }
