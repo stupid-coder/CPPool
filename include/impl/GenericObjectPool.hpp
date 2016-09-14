@@ -106,14 +106,16 @@ namespace CPPool
 
     virtual void returnObject(T *object) throw(IllegalStateException,BaseException)
     {
+      GuardMutexLock lock(lock_);
+
       this->assertOpen();
 
       PooledObject<T> *pooledObject = this->getPooledObjectFromAllObjects(object);
 
-      GuardMutexLock lock(lock_);
+
       if ( pooledObject->getState() != ALLOCATED )
         {
-          throw IllegalStateException("IllegalStateException: GenericObjectPool::returnObject - pooledObject state is not borrowed from this pool");
+          throw IllegalStateException("IllegalStateException: GenericObjectPool::returnObject - pooledObject state is not borrowed");
         }
       else
         {
@@ -160,9 +162,9 @@ namespace CPPool
     {
 
       GuardMutexLock lock(lock_);
-      while ( !idleObjects_.empty() )
+      while ( !allObjects_.empty() )
         {
-          PooledObject<T> *object = this->getPooledObjectFromIdleObjects();
+          PooledObject<T> *object = this->getPooledObjectFromAllObjects();
           this->destroy(object);
         }
 
@@ -244,10 +246,21 @@ namespace CPPool
       return iter->second;
     }
 
+    PooledObject<T> *getPooledObjectFromAllObjects()
+    {
+      PooledObject<T> *object = NULL;
+      if ( !allObjects_.empty() )
+        {
+          object = allObjects_.begin()->second;
+        }
+      return object;
+    }
+
     PooledObject<T> *getPooledObjectFromIdleObjects()
     {
       if ( idleObjects_.empty() ) return NULL;
       PooledObject<T> * object = idleObjects_.front();
+      idleObjects_.pop_front();
       return object;
     }
 

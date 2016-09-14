@@ -1,7 +1,11 @@
 #include <iostream>
 #include <impl/GenericObjectPool.hpp>
 #include <sys/time.h>
+#include <cstdlib>
+#include <cassert>
 
+#define LOOP_COUNT 10000
+int total;
 template <typename T>
 class TestPooledObjectFactory :
   public virtual CPPool::BasePooledObjectFactory<T>
@@ -21,6 +25,7 @@ public:
 
   virtual void destroyObject(CPPool::PooledObject<T> *object) throw(CPPool::BaseException)
   {
+  	__sync_add_and_fetch(&total,*object->getObject());
     delete object;
   }
 };
@@ -30,7 +35,7 @@ void *test_routine(void *arg)
 {
   CPPool::ObjectPool<int> *pool = (CPPool::ObjectPool<int>*)arg;
   int * client = 0;
-  for ( int i = 0 ; i < 10000; ++ i )
+  for ( int i = 0 ; i < LOOP_COUNT; ++ i )
     {
       try {
         client = pool->borrowObject();
@@ -68,5 +73,9 @@ int main(int argc, char *argv[])
 
   std::cout << "cost time:" << end.tv_sec-begin.tv_sec+(end.tv_usec-begin.tv_usec)/1000000.0 << std::endl;
 
+  pool.close();
+
+  std::cout << "total:" << total << std::endl;
+  assert(num*LOOP_COUNT==total);
   return 0;
 }
