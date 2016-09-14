@@ -47,6 +47,11 @@ namespace CPPool
       testOnCreate_ = config->getTestOnCreate();
     }
 
+    static long identityWrapper(T *object)
+    {
+      return (long)object;
+    }
+
   private:
     int maxTotalPerKey_;
     int maxIdlePerKey_;

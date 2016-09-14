@@ -11,15 +11,15 @@ namespace CPPool
   public:
     virtual ~KeyedPooledObjectFactory() {}
 
-    virtual PooledObject<V> makeObject(const K *key) throw(BaseException) = 0;
+    virtual PooledObject<V> *makeObject(const K *key) throw(BaseException) = 0;
 
     virtual void destroyObject(const K *key, PooledObject<V> *object) throw(BaseException) = 0;
 
-    virtual boolean validateObject(const K *key, PooledObject<V> *object) = 0;
+    virtual bool validateObject(const K *key, PooledObject<V> *object) = 0;
 
     virtual void activateObject(const K *key, PooledObject<V> *object) throw(BaseException) = 0;
 
-    virtual void passiveObject(const K *key, PooledObject<V> *object) throw(BaseException) = 0;
+    virtual void passivateObject(const K *key, PooledObject<V> *object) throw(BaseException) = 0;
   };
 }
 

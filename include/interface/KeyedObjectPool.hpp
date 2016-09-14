@@ -16,7 +16,7 @@ namespace CPPool
 
     virtual void returnObject(const K *key, V *object) throw(IllegalStateException, BaseException) = 0;
 
-    virtual void invalidateObject(const K *key, V *object) throw(Exception) = 0;
+    virtual void invalidateObject(const K *key, V *object) throw(BaseException) = 0;
 
     virtual void addObject(const K *key) throw(IllegalStateException,UnsupportedOperationException) = 0;
 
@@ -28,7 +28,7 @@ namespace CPPool
 
     virtual int getNumActive() = 0;
 
-    virtual void clear() throw(IllegalStateStateException,UnsupportedOperationException) = 0;
+    virtual void clear() throw(UnsupportedOperationException,BaseException) = 0;
 
     virtual void clear(const K *key) throw(UnsupportedOperationException,BaseException) = 0;
 

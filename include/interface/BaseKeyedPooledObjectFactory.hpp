@@ -22,7 +22,7 @@ namespace CPPool
       return wrap(create(key));
     }
 
-    virtual void destroyObject(const K *key, PooledObject<V> *object)
+    virtual void destroyObject(const K *key, PooledObject<V> *object) throw(BaseException)
     {
       throw BaseException("BaseException: BaseKeyedPooledObjectFactory::destroyObject");
     }
@@ -39,7 +39,7 @@ namespace CPPool
     virtual void passivateObject(const K *key, PooledObject<V> *object) throw(BaseException)
     {
     }
-
+  };
 }
 
 #endif

@@ -48,7 +48,7 @@ namespace CPPool
       return -1;
     }
 
-    virtual void clear() throw(IllegalStateStateException,UnsupportedOperationException)
+    virtual void clear() throw(UnsupportedOperationException,BaseException)
     {
       throw UnsupportedOperationException("UnsupportedOperationException: BaseKeyedObjectPool::clear");
     }
@@ -68,11 +68,13 @@ namespace CPPool
       return closed_;
     }
 
-    void assertOpen() throw(IllegalStateStateException)
+    void assertOpen() throw(IllegalStateException)
     {
-      if (isClosed()) throw IllegalStateStateException("IllegalStateStateException: BaseKeyedObjectPool::assertOpen - failure");
+      if (isClosed()) throw IllegalStateException("IllegalStateException: BaseKeyedObjectPool::assertOpen - failure");
     }
-  private:
+
+
+  protected:
     volatile bool closed_;
   };
 
