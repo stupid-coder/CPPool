@@ -18,12 +18,11 @@ namespace CPPool
 
     ~ObjectDeque()
     {
-      for ( typename std::map< long, PooledObject<T>* >::iterator iter = allObjects_.begin();
-            iter != allObjects_.end();
-            ++ iter )
-        {
-          if ( iter->second != NULL ) delete iter->second;
-        }
+    }
+
+    std::map< long, PooledObject<T>* > *getAllObjects()
+    {
+      return allObjects_;
     }
 
     bool hasIdleObject() const
@@ -88,6 +87,18 @@ namespace CPPool
       GuardRWLockWR lock(lock_);
       typename std::map< long, PooledObject<T>* >::iterator find_iter = allObjects_.find(id);
       if ( find_iter != allObjects_.end() ) allObjects_.erase(find_iter);
+    }
+
+    PooledObject<T> *removePooledObjectFromAllObjectsNonlock()
+    {
+      if ( allObjects_.empty() )
+        {
+          PooledObject<T>* object = allObjects_.begin()->second;
+          allObjects_.erase(allObjects_.begin());
+          return object;
+        }
+      else
+        return NULL;
     }
 
   private:

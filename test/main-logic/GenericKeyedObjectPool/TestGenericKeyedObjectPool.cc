@@ -34,6 +34,7 @@ public:
 
   virtual void destroyObject(const K *key, CPPool::PooledObject<V> *object) throw(CPPool::BaseException)
   {
+    std::cout << "KEY:" << key->c_str() << "\tvalue:" << *object->getObject() << std::endl;
     delete object;
   }
 };
@@ -53,10 +54,28 @@ void *test_routine(void *arg)
   for ( int i = 0; i < LOOP_COUNT; ++i )
     {
       std::string *backend = &backends[random()%size_backends];
-      std::cout << "backends:" << backend->c_str() << std::endl;
       int *client = pool->borrowObject(backend);
       ++ *client;
       pool->returnObject(backend,client);
+    }
+  pthread_exit(NULL);
+}
+
+void *test_error_routine(void *arg)
+{
+  int size_backends = sizeof(backends)/sizeof(std::string);
+
+  CPPool::KeyedObjectPool<std::string,int> *pool = (CPPool::KeyedObjectPool<std::string,int>*)arg;
+
+  timeval seed;
+  gettimeofday(&seed,NULL);
+  srandom(seed.tv_usec);
+  for ( int i = 0; i < LOOP_COUNT; ++i )
+    {
+      std::string *backend = &backends[random()%size_backends];
+      int *client = pool->borrowObject(backend);
+      ++ *client;
+      pool->invalidateObject(backend,client);
     }
   pthread_exit(NULL);
 }
@@ -83,7 +102,7 @@ int main(int argc, char *argv[])
 
   gettimeofday(&end,NULL);
 
-  std::cout << "cost time:" << end.tv_sec-begin.tv_sec + (end.tv_usec-begin.tv_usec)/1000000 << std::endl;
+  std::cout << "cost time:" << end.tv_sec-begin.tv_sec + (end.tv_usec-begin.tv_usec)/1000000.0 << std::endl;
 
   pool.close();
 
