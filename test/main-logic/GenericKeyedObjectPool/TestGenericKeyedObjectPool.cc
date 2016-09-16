@@ -2,8 +2,10 @@
 #include <impl/GenericKeyedObjectPool.hpp>
 #include <sys/time.h>
 #include <cstdlib>
-
+#include <cassert>
 #define LOOP_COUNT 10000
+
+int sum;
 
 std::string backends[] =
 {
@@ -35,6 +37,7 @@ public:
   virtual void destroyObject(const K *key, CPPool::PooledObject<V> *object) throw(CPPool::BaseException)
   {
     std::cout << "KEY:" << key->c_str() << "\tvalue:" << *object->getObject() << std::endl;
+    __sync_add_and_fetch(&sum,*object->getObject());
     delete object;
   }
 };
@@ -88,7 +91,7 @@ int main(int argc, char *argv[])
 
   if (argc>1) test_num = atoi(argv[1]);
 
-  pthread_t pid[test_num];
+  pthread_t pid[test_num+1];
 
   timeval begin,end;
 
@@ -97,7 +100,9 @@ int main(int argc, char *argv[])
   for ( int i = 0; i < test_num; ++ i )
     pthread_create(&pid[i],NULL,test_routine,&pool);
 
-  for ( int i = 0; i < test_num; ++ i )
+	pthread_create(&pid[test_num],NULL,test_error_routine,&pool);
+
+  for ( int i = 0; i <= test_num; ++ i )
     pthread_join(pid[i],NULL);
 
   gettimeofday(&end,NULL);
@@ -105,6 +110,9 @@ int main(int argc, char *argv[])
   std::cout << "cost time:" << end.tv_sec-begin.tv_sec + (end.tv_usec-begin.tv_usec)/1000000.0 << std::endl;
 
   pool.close();
+
+std::cout << "sum:" << sum << "\tassert:" << LOOP_COUNT*(test_num+1) << std::endl;
+  assert( sum == LOOP_COUNT*(test_num+1) );
 
   return 0;
 }

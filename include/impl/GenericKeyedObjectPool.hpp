@@ -140,10 +140,7 @@ namespace CPPool
 
       try {
         this->destroy(key,object);
-      } catch (BaseException e) {
-        this->deregiste(key);
-        throw e;
-      }
+      } catch (BaseException e) {}
 
       this->deregiste(key);
 
@@ -173,7 +170,13 @@ namespace CPPool
             iter != poolMap_.end();
             ++ iter )
         {
-          clear(&iter->first);
+          PooledObject<V> *object = NULL;
+          while ( (object = iter->second->removePooledObjectFromAllObjectsNonlock()) != NULL )
+            {
+              try {
+                factory_->destroyObject(&iter->first,object);
+              } catch( BaseException e ) {}
+            }
         }
 
       poolMap_.clear();
@@ -182,17 +185,19 @@ namespace CPPool
 
     virtual void clear(const K *key) throw(UnsupportedOperationException,BaseException)
     {
-      ObjectDeque<V> *objectDeque = this->registe(key);
+      GuardRWLockWR wrlock(lock_);
 
-      for ( PooledObject<V> *object = objectDeque->removePooledObjectFromAllObjectsNonlock();
-            object != NULL;
-            object = objectDeque->removePooledObjectFromAllObjectsNonlock() )
+      ObjectDeque<V> *objectDeque = this->getObjectDequeFromPoolMapNonlock(key);
+
+      if ( objectDeque == NULL ) return;
+
+      PooledObject<V> *object;
+      while ( (object = objectDeque->removePooledObjectFromAllObjectsNonlock()) != NULL )
         {
           try {
             factory_->destroyObject(key,object);
           } catch( BaseException e ) {}
         }
-      this->deregiste(key);
     }
 
     virtual void close()
@@ -311,7 +316,7 @@ namespace CPPool
 
       numInterested = objectDeque->decreamentAndGetNumInterested();
 
-      if ( numInterested == 0 && objectDeque->nonBorrowedObject() )
+      if ( numInterested == 0 && objectDeque->empty() )
         {
           GuardRWLockWR wrlock(lock_);
 
@@ -320,7 +325,7 @@ namespace CPPool
           if ( objectDeque != NULL ) {
             numInterested = objectDeque->getNumInterested();
 
-            if ( numInterested == 0 && objectDeque->nonBorrowedObject() )
+            if ( numInterested == 0 && objectDeque->empty() )
               {
                 poolMap_.erase(*key);
                 delete objectDeque;

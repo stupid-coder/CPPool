@@ -17,8 +17,7 @@ namespace CPPool
     {}
 
     ~ObjectDeque()
-    {
-    }
+    {}
 
     std::map< long, PooledObject<T>* > *getAllObjects()
     {
@@ -33,6 +32,11 @@ namespace CPPool
     bool nonBorrowedObject() const
     {
       return idleObjects_.size() == allObjects_.size();
+    }
+
+    bool empty() const
+    {
+      return allObjects_.empty();
     }
 
     int increamentAndGetNumInterested()
@@ -91,7 +95,7 @@ namespace CPPool
 
     PooledObject<T> *removePooledObjectFromAllObjectsNonlock()
     {
-      if ( allObjects_.empty() )
+      if ( !allObjects_.empty() )
         {
           PooledObject<T>* object = allObjects_.begin()->second;
           allObjects_.erase(allObjects_.begin());
