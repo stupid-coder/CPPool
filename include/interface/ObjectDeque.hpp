@@ -12,7 +12,9 @@ namespace CPPool
   class ObjectDeque
   {
   public:
-    ObjectDeque() {}
+    ObjectDeque()
+      : numInterested_(0)
+    {}
 
     ~ObjectDeque()
     {
@@ -24,19 +26,29 @@ namespace CPPool
         }
     }
 
-    std::deque<PooledObject<T>*> &getIdleObjects()
-    {
-      return idleObjects_;
-    }
-
-    std::map< long, PooledObject<T> > &getAllObjects()
-    {
-      return allObjects_;
-    }
-
     bool hasIdleObject() const
     {
       return idleObjects_.empty() == false;
+    }
+
+    bool nonBorrowedObject() const
+    {
+      return idleObjects_.size() == allObjects_.size();
+    }
+
+    int increamentAndGetNumInterested()
+    {
+      return __sync_add_and_fetch(&numInterested_,1);
+    }
+
+    int decreamentAndGetNumInterested()
+    {
+      return __sync_sub_and_fetch(&numInterested_,1);
+    }
+
+    int getNumInterested() const
+    {
+      return numInterested_;
     }
 
     PooledObject<T> *getPooledObjectFromIdleObjects()
@@ -77,11 +89,12 @@ namespace CPPool
       typename std::map< long, PooledObject<T>* >::iterator find_iter = allObjects_.find(id);
       if ( find_iter != allObjects_.end() ) allObjects_.erase(find_iter);
     }
+
   private:
     RWLock lock_;
     std::deque<PooledObject<T>*> idleObjects_;
     std::map< long, PooledObject<T>* > allObjects_;
-
+    int numInterested_;
   };
 
 }

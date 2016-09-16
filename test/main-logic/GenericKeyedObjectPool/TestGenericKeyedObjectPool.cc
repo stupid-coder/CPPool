@@ -54,7 +54,7 @@ void *test_routine(void *arg)
     {
       std::string *backend = &backends[random()%size_backends];
       std::cout << "backends:" << backend->c_str() << std::endl;
-2     int *client = pool->borrowObject(backend);
+      int *client = pool->borrowObject(backend);
       ++ *client;
       pool->returnObject(backend,client);
     }

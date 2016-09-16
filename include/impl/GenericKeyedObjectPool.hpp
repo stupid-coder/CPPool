@@ -44,15 +44,18 @@ namespace CPPool
 
       ObjectDeque<V> *objectDeque = this->registe(key);
 
-      if ( objectDeque == NULL ) throw BaseException("BaseException: GenericKeyedObjectPool::borrowObject - failure to get ObjectDeque");
-
       do {
 
         object = objectDeque->getPooledObjectFromIdleObjects();
 
         if ( object == NULL )
           {
-            object = this->create(key);
+            try {
+              object = this->create(key);
+            } catch (BaseException e) {
+              this->deregiste(key);
+              throw e;
+            }
             created = true;
           }
 
@@ -65,6 +68,7 @@ namespace CPPool
                 this->destroy(key,object);
               } catch (BaseException de) {
               }
+              this->deregiste(key);
               throw ae;
             }
 
@@ -86,7 +90,11 @@ namespace CPPool
                 }
               }
 
-            if ( object == NULL ) throw BaseException("BaseException GenericKeyedObjectPool::borrowObject - failure to borrow object");
+            if ( object == NULL )
+              {
+                this->deregiste(key);
+                throw BaseException("BaseException GenericKeyedObjectPool::borrowObject - failure to borrow object");
+              }
           }
       } while ( object == NULL );
 
@@ -101,11 +109,7 @@ namespace CPPool
     {
       this->assertOpen();
 
-      ObjectDeque<V> *objectDeque = NULL;
-
-      objectDeque = this->getObjectDequeFromPoolMap(key);
-
-      if ( objectDeque == NULL ) throw BaseException("BaseException: GenericKeyedObjectPool::returnObject - failure to return object of key cannot be finded in pool");
+      ObjectDeque<V> *objectDeque = this->registe(key);
 
       PooledObject<V> *pooledObject = objectDeque->getPooledObjectFromAllObjects(this->identityWrapper(object));
 
@@ -119,24 +123,29 @@ namespace CPPool
         try {
           this->destroy(key,pooledObject);
         } catch (BaseException de) {
+          this->deregiste(key);
           throw de;
         }
       }
 
       objectDeque->putPooledObjectToIdleObjects(pooledObject);
 
+      this->deregiste(key);
     }
 
     virtual void invalidateObject(const K *key, V *object) throw(BaseException)
     {
 
-      GuardRWLockRD lock(lock_);
+      this->registe(key);
 
       try {
         this->destroy(key,object);
       } catch (BaseException e) {
+        this->deregiste(key);
         throw e;
       }
+
+      this->deregiste(key);
 
     }
 
@@ -145,19 +154,20 @@ namespace CPPool
 
       this->assertOpen();
 
+      this->registe(key);
+
       try {
         PooledObject<V> *object = this->create(key);
         this->addIdleObject(key, object);
       } catch(BaseException e) {}
 
       this->deregiste(key);
-
     }
 
     virtual void clear() throw(UnsupportedOperationException,BaseException)
     {
 
-      GuardRWLockWR lock(lock_);
+      GuardRWLockWR wrlock(lock_);
 
       for ( typename std::map<K, ObjectDeque<V>* >::iterator iter = poolMap_.begin();
             iter != poolMap_.end();
@@ -167,19 +177,13 @@ namespace CPPool
         }
 
       poolMap_.clear();
+
     }
 
     virtual void clear(const K *key) throw(UnsupportedOperationException,BaseException)
     {
-
-      GuardRWLockWR lock(lock_);
-
-      ObjectDeque<V> *objectDeque = this->getObjectDequeFromPoolMap(key);
-
-      if ( objectDeque == NULL ) return;
-      else delete objectDeque;
-
-      poolMap_.erase(*key);
+      ObjectDeque<V> *objectDeque = this->registe(key);
+      this->deregiste(key);
     }
 
     virtual void close()
@@ -201,11 +205,13 @@ namespace CPPool
 
     void addIdleObject(const K *key, PooledObject<V> *object) throw(BaseException)
     {
+
       if ( object != NULL )
         {
+          GuardRWLockRD rdlock(lock_);
+          ObjectDeque<V> *objectDeque = this->getObjectDequeFromPoolMap(key);
           object->markIdle();
           factory_->passivateObject(key,object);
-          ObjectDeque<V> *objectDeque = this->registe(key);
           objectDeque->putPooledObjectToIdleObjects(object);
         }
     }
@@ -213,8 +219,10 @@ namespace CPPool
     PooledObject<V> *create(const K *key) throw(BaseException)
     {
       // TODO: maxIdle minIdle maxTotal 限制
-      ObjectDeque<V> *objectDeque = this->getObjectDequeFromPoolMap(key);
+      ObjectDeque<V> *objectDeque = NULL;
       PooledObject<V> *object = NULL;
+
+      objectDeque = this->getObjectDequeFromPoolMap(key);
 
       try {
         object = factory_->makeObject(key);
@@ -231,21 +239,7 @@ namespace CPPool
     void destroy(const K *key, PooledObject<V> *object) throw(BaseException)
     {
 
-      ObjectDeque<V> *objectDeque = this->getObjectDequeFromPoolMap(key);
-
-      if ( objectDeque == NULL ) throw BaseException("BaseException: GenericKeyedObjectPool::invalidateObject - the object is not in the Pool");
-
-      PooledObject<V> *pooledObject = objectDeque->getPooledObjectFromAllObjects(this->identityWrapper(object->getObject()));
-
-      if ( pooledObject == NULL ) throw BaseException("BaseException: GenericKeyedObjectPool::invlaidateObject - the object is not in the pool");
-
-      objectDeque->removePooledObjectFromAllObjects(this->identityWrapper(object->getObject()));
-
-      try {
-        factory_->destroyObject(key,object);
-      } catch (BaseException e) {
-      }
-
+      this->destroy(key,object->getObject());
     }
 
     void destroy(const K *key, V *object) throw(BaseException)
@@ -253,7 +247,7 @@ namespace CPPool
 
       ObjectDeque<V> *objectDeque = this->getObjectDequeFromPoolMap(key);
 
-      if ( objectDeque == NULL ) throw BaseException("BaseException: GenericKeyedObjectPool::invalidateObject - the object is not in the Pool");
+      if ( objectDeque == NULL ) throw BaseException("BaseException: GenericKeyedObjectPool::destroy - failure to fidn ObjectDeque");
 
       PooledObject<V> *pooledObject = objectDeque->getPooledObjectFromAllObjects(this->identityWrapper(object));
 
@@ -273,47 +267,84 @@ namespace CPPool
 
       ObjectDeque<V> *objectDeque = NULL;
 
-      try {
-        {
-          GuardRWLockRD rdlock(lock_);
-          objectDeque = this->getObjectDequeFromPoolMap(key);
-        }
-        if ( objectDeque == NULL )
-          {
-            GuardRWLockWR wrlock(lock_);
-            objectDeque = this->getObjectDequeFromPoolMap(key);
-            if ( objectDeque == NULL )
-              {
-                objectDeque = new ObjectDeque<V>();
-                this->putObjectDequeToPoolMap(key,objectDeque);
-              }
-          }
-      } catch (BaseException e) {
+      {
+        GuardRWLockRD rdlock(lock_);
+        objectDeque = this->getObjectDequeFromPoolMapNonlock(key);
+        if ( objectDeque != NULL )
+          objectDeque->increamentAndGetNumInterested();
       }
 
+      if ( objectDeque == NULL )
+        {
+          GuardRWLockWR wrlock(lock_);
+          objectDeque = this->getObjectDequeFromPoolMapNonlock(key);
+          if ( objectDeque == NULL )
+            {
+              objectDeque = new ObjectDeque<V>();
+              this->putObjectDequeToPoolMapNonlock(key,objectDeque);
+            }
+          objectDeque->increamentAndGetNumInterested();
+        }
+
       return objectDeque;
+
     }
 
-    void deregiste(const K *key)
+    void deregiste(const K *key) throw(BaseException)
     {
       // TODO: ObjectDeque 记录消除
-      return;
+      ObjectDeque<V> *objectDeque = NULL;
+      int numInterested = 0;
+
+      objectDeque = this->getObjectDequeFromPoolMap(key);
+
+      if ( objectDeque == NULL ) throw BaseException("BaseException: GenericKeyedObjectPool::deregiste - failure to find ObjectDeque");
+
+      numInterested = objectDeque->decreamentAndGetNumInterested();
+
+      if ( numInterested == 0 && objectDeque->nonBorrowedObject() )
+        {
+          GuardRWLockWR wrlock(lock_);
+
+          objectDeque = this->getObjectDequeFromPoolMapNonlock(key);
+
+          if ( objectDeque != NULL ) {
+            numInterested = objectDeque->getNumInterested();
+
+            if ( numInterested == 0 && objectDeque->nonBorrowedObject() )
+              {
+                poolMap_.erase(*key);
+                delete objectDeque;
+              }
+          }
+        }
     }
 
     ObjectDeque<V> * getObjectDequeFromPoolMap(const K *key)
     {
-      GuardRWLockRD lock(lock_);
+      GuardRWLockRD rdlock(lock_);
+      return getObjectDequeFromPoolMapNonlock(key);
+    }
 
+    ObjectDeque<V> *getObjectDequeFromPoolMapNonlock(const K *key)
+    {
       typename std::map< K, ObjectDeque<V>* >::iterator find_iter = poolMap_.find(*key);
 
       if ( find_iter == poolMap_.end() ) return NULL;
       else return find_iter->second;
     }
+
     void putObjectDequeToPoolMap(const K *key, ObjectDeque<V> *objectDeque)
     {
-      GuardRWLockWR lock(lock_);
+      GuardRWLockWR wrlock(lock_);
+      putObjectDequeToPoolMapNonlock(key,objectDeque);
+    }
+
+    void putObjectDequeToPoolMapNonlock(const K *key, ObjectDeque<V> *objectDeque)
+    {
       poolMap_.insert(std::make_pair< K,ObjectDeque<V>* >(*key, objectDeque));
     }
+
 
   private:
 
