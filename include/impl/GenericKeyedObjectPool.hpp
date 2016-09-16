@@ -173,7 +173,7 @@ namespace CPPool
             iter != poolMap_.end();
             ++ iter )
         {
-          delete iter->second;
+          clear(&iter->first);
         }
 
       poolMap_.clear();
@@ -183,19 +183,21 @@ namespace CPPool
     virtual void clear(const K *key) throw(UnsupportedOperationException,BaseException)
     {
       ObjectDeque<V> *objectDeque = this->registe(key);
-      
+
       for ( PooledObject<V> *object = objectDeque->removePooledObjectFromAllObjectsNonlock();
             object != NULL;
             object = objectDeque->removePooledObjectFromAllObjectsNonlock() )
         {
-
+          try {
+            factory_->destroyObject(key,object);
+          } catch( BaseException e ) {}
         }
       this->deregiste(key);
     }
 
     virtual void close()
     {
-n      if ( this->isClosed() ) return;
+      if ( this->isClosed() ) return;
 
       this->closed_ = true;
 
