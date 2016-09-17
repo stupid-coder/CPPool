@@ -75,27 +75,25 @@ namespace CPPool
               } catch ( BaseException de ) {
                 // 忽略
               }
+              throw BaseException("BaseException: GenericObjectPool::borrowObject - failure");
+            }
 
-              object = NULL;
+            if ( this->getTestOnBorrow() || (created && this->getTestOnCreate()) )
+              {
+                bool validate = false;
+                try {
+                  validate = factory_->validateObject(object);
+                } catch ( BaseException ve ) {}
 
-              if ( created ) throw BaseException("BaseException: GenericObjectPool::borrowObject - failure");
-
-              if ( this->getTestOnBorrow() || (created && this->getTestOnCreate()) )
-                {
-                  bool validate = false;
+                if ( validate == false ) {
                   try {
-                    validate = factory_->validateObject(object);
-                  } catch ( BaseException ve ) {}
-
-                  if ( validate == false ) {
-                    try {
-                      this->destroy(object);
-                    } catch ( BaseException de ) {
-                      throw de;
-                    }
+                    this->destroy(object);
+                  } catch ( BaseException de ) {
+                    throw de;
                   }
                 }
-            }
+              }
+
           }
       } while ( object == NULL );
 
